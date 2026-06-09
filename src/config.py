@@ -1,6 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
 from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -18,14 +19,19 @@ class Settings(BaseSettings):
 
     voice: str = Field(default="alloy", validation_alias="VOICE")
     system_message: str = Field(
-        default="You are a cheerful and bubbly customer support agent who deals with customers efficiently and says haha now and then please.",
+        default=(
+            "You are a cheerful and bubbly customer support agent who deals "
+            "with customers efficiently and says haha now and then please."
+        ),
         validation_alias="SYSTEM_MESSAGE",
     )
     temperature: float = Field(default=0.8, validation_alias="TEMPERATURE")
     turn_detection_type: str = Field(default="server_vad", validation_alias="TURN_DETECTION_TYPE")
     input_audio_format: str = Field(default="g711_ulaw", validation_alias="INPUT_AUDIO_FORMAT")
     output_audio_format: str = Field(default="g711_ulaw", validation_alias="OUTPUT_AUDIO_FORMAT")
-    input_audio_transcription_model: str = Field(default="whisper-1", validation_alias="INPUT_AUDIO_TRANSCRIPTION_MODEL")
+    input_audio_transcription_model: str = Field(
+        default="whisper-1", validation_alias="INPUT_AUDIO_TRANSCRIPTION_MODEL"
+    )
 
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     log_format: str = Field(default="json", validation_alias="LOG_FORMAT")
@@ -39,4 +45,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    return Settings()  # type: ignore[call-arg]
