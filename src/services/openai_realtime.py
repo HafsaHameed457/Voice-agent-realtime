@@ -97,6 +97,28 @@ class OpenAIRealtimeClient:
             logger.warning("Cannot send audio: OpenAI connection closed")
             self._connected = False
 
+    async def send_text(self, text: str) -> None:
+        if not self._ws or not self._connected:
+            return
+        try:
+            item_payload = json.dumps(
+                {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": text}],
+                    },
+                }
+            )
+            await self._ws.send(item_payload)
+            response_payload = json.dumps({"type": "response.create"})
+            await self._ws.send(response_payload)
+            logger.debug("Sent text: %s", text[:50])
+        except websockets.ConnectionClosed:
+            logger.warning("Cannot send text: OpenAI connection closed")
+            self._connected = False
+
     async def _send_session_update(self) -> None:
         if not self._ws:
             return
