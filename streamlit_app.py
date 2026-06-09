@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import base64
 import json
 import threading
 import time
 from queue import Empty, Queue
+from typing import Any
 
 import streamlit as st
 from websockets.sync.client import connect
+
+from src.utils.audio import mulaw_to_wav
 
 st.set_page_config(page_title="Voice Agent", page_icon="🎙️", layout="centered")
 st.title("Voice Agent — Browser Test Client")
@@ -61,9 +65,13 @@ def _init_state() -> None:
         st.session_state.recv_queue = Queue()
     if "ws_thread" not in st.session_state:
         st.session_state.ws_thread = None
+    if "audio_buffer" not in st.session_state:
+        st.session_state.audio_buffer = bytearray()
+    if "pending_audio" not in st.session_state:
+        st.session_state.pending_audio = None
 
 
-def _handle_event(event: dict) -> None:
+def _handle_event(event: dict[str, Any]) -> None:
     t = event.get("type", "")
 
     if t == "$connected":
@@ -82,6 +90,15 @@ def _handle_event(event: dict) -> None:
         role = event.get("role", "assistant")
         text = event.get("text", "")
         st.session_state.messages.append({"role": role, "text": text})
+        if role == "assistant" and st.session_state.audio_buffer:
+            wav_bytes = mulaw_to_wav(bytes(st.session_state.audio_buffer))
+            st.session_state.pending_audio = wav_bytes
+            st.session_state.audio_buffer = bytearray()
+    elif t == "audio.delta":
+        audio_b64 = event.get("audio", "")
+        if audio_b64:
+            mulaw_bytes = base64.b64decode(audio_b64)
+            st.session_state.audio_buffer.extend(mulaw_bytes)
     elif t == "error":
         st.error(f"Server error: {event.get('message', '')}")
 
@@ -139,6 +156,8 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.connected = False
         st.session_state.ws_thread = None
+        st.session_state.audio_buffer = bytearray()
+        st.session_state.pending_audio = None
         st.rerun()
 
     if st.button("Clear Chat", use_container_width=True):
@@ -154,6 +173,11 @@ for msg in st.session_state.messages:
         st.markdown(msg["text"])
 
 
+if st.session_state.pending_audio:
+    st.audio(st.session_state.pending_audio, format="audio/wav")
+    st.session_state.pending_audio = None
+
+
 if prompt := st.chat_input(
     "Type a message...",
     disabled=not st.session_state.connected,
@@ -161,3 +185,27 @@ if prompt := st.chat_input(
     st.session_state.messages.append({"role": "user", "text": prompt})
     st.session_state.send_queue.put({"type": "text", "text": prompt})
     st.rerun()
+
+
+st.divider()
+st.subheader("🎤 Audio Input")
+
+audio_bytes = st.audio_input(
+    "Record a message",
+    key="audio_recorder",
+    disabled=not st.session_state.connected,
+)
+
+if audio_bytes is not None:
+    try:
+        from src.utils.audio import encode_base64, webm_to_pcm16
+
+        with st.spinner("Processing audio..."):
+            pcm16 = webm_to_pcm16(audio_bytes, target_sample_rate=24000)
+            audio_b64 = encode_base64(pcm16)
+
+        st.session_state.send_queue.put({"type": "audio", "audio": audio_b64})
+        st.success("Audio sent! Waiting for response...")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Audio processing failed: {e}")

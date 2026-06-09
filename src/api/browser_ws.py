@@ -119,6 +119,11 @@ async def browser_stream(websocket: WebSocket) -> None:
                     session_manager.add_user_transcript(session_id, text)
                     await openai_client.send_text(text)
 
+            elif msg_type == "audio":
+                audio_b64 = data.get("audio", "")
+                if audio_b64:
+                    await openai_client.send_audio(audio_b64)
+
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
 
