@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import json
 import time
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from src.config import get_settings
 from src.models.session import SessionState
 from src.services.openai_realtime import OpenAIEventHandlers, OpenAIRealtimeClient
-from src.services.session_manager import SessionManager
+from src.services.session_manager import get_session_manager
 from src.services.twilio import parse_twilio_event
 from src.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from src.services.base_session_manager import BaseSessionManager
 
 logger = get_logger(__name__)
 
@@ -21,7 +25,7 @@ class MediaStreamHandler(OpenAIEventHandlers):
     def __init__(
         self,
         websocket: WebSocket,
-        session_manager: SessionManager,
+        session_manager: BaseSessionManager,
         session_id: str,
     ) -> None:
         self._websocket = websocket
@@ -48,10 +52,10 @@ class MediaStreamHandler(OpenAIEventHandlers):
             logger.exception("Failed to send audio to client")
 
     async def on_user_transcript(self, transcript: str) -> None:
-        self._session_manager.add_user_transcript(self._session_id, transcript)
+        await self._session_manager.add_user_transcript(self._session_id, transcript)
 
     async def on_agent_transcript(self, transcript: str) -> None:
-        self._session_manager.add_agent_transcript(self._session_id, transcript)
+        await self._session_manager.add_agent_transcript(self._session_id, transcript)
 
     async def on_error(self, error: Exception) -> None:
         logger.error("OpenAI error in session %s: %s", self._session_id, error)
@@ -71,8 +75,8 @@ async def media_stream(websocket: WebSocket) -> None:
     )
     logger.info("Client connected: session_id=%s", session_id)
 
-    session_manager = SessionManager()
-    session = session_manager.create_session(session_id)
+    session_manager = get_session_manager()
+    session = await session_manager.create_session(session_id)
 
     handler = MediaStreamHandler(websocket, session_manager, session_id)
     openai_client = OpenAIRealtimeClient(
@@ -93,7 +97,7 @@ async def media_stream(websocket: WebSocket) -> None:
             if event.event_type == "start" and event.stream_sid:
                 handler.set_stream_sid(event.stream_sid)
                 session.stream_sid = event.stream_sid
-                session_manager.update_session(session)
+                await session_manager.update_session(session)
                 logger.info(
                     "Stream started: session_id=%s stream_sid=%s",
                     session_id,
@@ -115,4 +119,4 @@ async def media_stream(websocket: WebSocket) -> None:
         transcript_text = session.get_transcript_text()
         logger.info("Session %s transcript:\n%s", session_id, transcript_text)
         await openai_client.disconnect()
-        session_manager.delete_session(session_id)
+        await session_manager.delete_session(session_id)

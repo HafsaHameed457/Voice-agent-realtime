@@ -38,6 +38,9 @@ class Settings(BaseSettings):
 
     webhook_url: str | None = Field(default=None, validation_alias="WEBHOOK_URL")
 
+    redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
+    redis_key_prefix: str = Field(default="voice_agent", validation_alias="REDIS_KEY_PREFIX")
+
     @property
     def openai_ws_url(self) -> str:
         return "wss://api.openai.com/v1/realtime?model=gpt-realtime"

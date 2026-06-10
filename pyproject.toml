@@ -13,6 +13,7 @@ dependencies = [
     "httpx>=0.27",
     "requests>=2.31",
     "pydub>=0.25",
+    "redis>=5.0",
 ]
 [project.optional-dependencies]
 dev = [
