@@ -5,9 +5,11 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from src.api.browser_ws import router as browser_ws_router
 from src.api.routes import router as http_router
+from src.api.test_client import router as test_router
 from src.api.websocket import router as ws_router
 from src.config import get_settings
 from src.utils.logging import get_logger, setup_logging
@@ -43,9 +45,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(http_router)
 app.include_router(ws_router)
 app.include_router(browser_ws_router)
+app.include_router(test_router)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import io
 import struct
 import wave
 
-from pydub import AudioSegment
+from pydub import AudioSegment  # type: ignore[import-untyped]
 
 MULAW_BIAS = 0x84
 MULAW_CLIP = 32635
@@ -60,7 +60,7 @@ def webm_to_pcm16(webm_bytes: bytes, target_sample_rate: int = 24000) -> bytes:
     """Convert WebM/Opus bytes to PCM16 @ target_sample_rate."""
     audio = AudioSegment.from_file(io.BytesIO(webm_bytes), format="webm")
     audio = audio.set_frame_rate(target_sample_rate).set_channels(1).set_sample_width(2)
-    return audio.raw_data
+    return bytes(audio.raw_data)
 
 
 def pcm16_to_wav(pcm16_bytes: bytes, sample_rate: int = 24000) -> bytes:
