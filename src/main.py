@@ -27,7 +27,12 @@ logger = get_logger(__name__)
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, Any]:
     setup_logging()
     logger.info("Starting Voice Agent Realtime server")
-    logger.info("Groq LLM=%s | STT=%s | Temperature=%s", settings.groq_llm_model, settings.groq_stt_model, settings.temperature)
+    logger.info(
+        "Groq LLM=%s | STT=%s | Temperature=%s",
+        settings.groq_llm_model,
+        settings.groq_stt_model,
+        settings.temperature,
+    )
     yield
     logger.info("Shutting down Voice Agent Realtime server")
 

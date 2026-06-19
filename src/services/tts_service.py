@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 
 import edge_tts
-from pydub import AudioSegment
+from pydub import AudioSegment  # type: ignore[import-untyped]
 
 from src.utils.logging import get_logger
 
