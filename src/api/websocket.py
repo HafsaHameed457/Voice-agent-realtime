@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import time
 from typing import TYPE_CHECKING
@@ -8,9 +9,10 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from src.config import get_settings
 from src.models.session import SessionState
-from src.services.openai_realtime import OpenAIEventHandlers, OpenAIRealtimeClient
+from src.services.pipeline_service import PipelineOrchestrator
 from src.services.session_manager import get_session_manager
 from src.services.twilio import parse_twilio_event
+from src.utils.audio import mulaw_to_pcm16, pcm16_to_mulaw
 from src.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -21,7 +23,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-class MediaStreamHandler(OpenAIEventHandlers):
+class MediaStreamHandler:
     def __init__(
         self,
         websocket: WebSocket,
@@ -41,11 +43,14 @@ class MediaStreamHandler(OpenAIEventHandlers):
         if not target_stream:
             return
         try:
+            pcm16 = base64.b64decode(audio_base64)
+            mulaw = pcm16_to_mulaw(pcm16)
+            payload = base64.b64encode(mulaw).decode("ascii")
             await self._websocket.send_json(
                 {
                     "event": "media",
                     "streamSid": target_stream,
-                    "media": {"payload": audio_base64},
+                    "media": {"payload": payload},
                 }
             )
         except Exception:
@@ -58,10 +63,10 @@ class MediaStreamHandler(OpenAIEventHandlers):
         await self._session_manager.add_agent_transcript(self._session_id, transcript)
 
     async def on_error(self, error: Exception) -> None:
-        logger.error("OpenAI error in session %s: %s", self._session_id, error)
+        logger.error("Pipeline error in session %s: %s", self._session_id, error)
 
     async def on_session_ready(self) -> None:
-        logger.info("OpenAI session ready for %s", self._session_id)
+        logger.info("Pipeline session ready for %s", self._session_id)
 
 
 @router.websocket("/media-stream")
@@ -79,13 +84,13 @@ async def media_stream(websocket: WebSocket) -> None:
     session = await session_manager.create_session(session_id)
 
     handler = MediaStreamHandler(websocket, session_manager, session_id)
-    openai_client = OpenAIRealtimeClient(
+    pipeline = PipelineOrchestrator(
         settings=get_settings(),
         handlers=handler,
     )
 
     try:
-        await openai_client.connect()
+        await pipeline.connect()
         session.set_state(SessionState.ACTIVE)
         logger.info("Session active: %s", session_id)
 
@@ -105,7 +110,9 @@ async def media_stream(websocket: WebSocket) -> None:
                 )
 
             elif event.event_type == "media" and event.audio_payload:
-                await openai_client.send_audio(event.audio_payload)
+                payload = base64.b64decode(event.audio_payload)
+                pcm16 = mulaw_to_pcm16(payload)
+                await pipeline.send_audio(pcm16)
 
             elif event.event_type == "mark":
                 logger.debug("Mark received: session_id=%s", session_id)
@@ -118,5 +125,5 @@ async def media_stream(websocket: WebSocket) -> None:
         session.set_state(SessionState.DISCONNECTED)
         transcript_text = session.get_transcript_text()
         logger.info("Session %s transcript:\n%s", session_id, transcript_text)
-        await openai_client.disconnect()
+        await pipeline.disconnect()
         await session_manager.delete_session(session_id)

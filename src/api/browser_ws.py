@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import time
 from typing import TYPE_CHECKING
 
@@ -7,8 +8,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from src.config import get_settings
 from src.models.session import Session, SessionState
-from src.services.openai_realtime import OpenAIRealtimeClient
+from src.services.pipeline_service import PipelineOrchestrator
 from src.services.session_manager import get_session_manager
+from src.utils.audio import pcm16_to_mulaw
 from src.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -33,10 +35,13 @@ class BrowserStreamHandler:
 
     async def on_audio_delta(self, audio_base64: str, _stream_sid: str) -> None:
         try:
+            pcm16 = base64.b64decode(audio_base64)
+            mulaw = pcm16_to_mulaw(pcm16)
+            payload = base64.b64encode(mulaw).decode("ascii")
             await self._websocket.send_json(
                 {
                     "type": "audio.delta",
-                    "audio": audio_base64,
+                    "audio": payload,
                 }
             )
         except Exception:
@@ -104,13 +109,13 @@ async def browser_stream(websocket: WebSocket) -> None:
     session = await session_manager.create_session(session_id)
 
     handler = BrowserStreamHandler(websocket, session_manager, session, session_id)
-    openai_client = OpenAIRealtimeClient(
+    pipeline = PipelineOrchestrator(
         settings=get_settings(),
         handlers=handler,
     )
 
     try:
-        await openai_client.connect()
+        await pipeline.connect()
         session.set_state(SessionState.ACTIVE)
 
         while True:
@@ -121,12 +126,13 @@ async def browser_stream(websocket: WebSocket) -> None:
                 text = data.get("text", "").strip()
                 if text:
                     await session_manager.add_user_transcript(session_id, text)
-                    await openai_client.send_text(text)
+                    await pipeline.send_text(text)
 
             elif msg_type == "audio":
                 audio_b64 = data.get("audio", "")
                 if audio_b64:
-                    await openai_client.send_audio(audio_b64)
+                    pcm16 = base64.b64decode(audio_b64)
+                    await pipeline.send_audio(pcm16)
 
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
@@ -138,5 +144,5 @@ async def browser_stream(websocket: WebSocket) -> None:
     finally:
         session.set_state(SessionState.DISCONNECTED)
         await session_manager.update_session(session)
-        await openai_client.disconnect()
+        await pipeline.disconnect()
         logger.info("Browser session cleaned up: %s", session_id)
