@@ -120,7 +120,7 @@ _drain_queue()
 with st.sidebar:
     st.header("Connection")
     server_host = st.text_input("Server host", value="localhost")
-    server_port = st.text_input("Server port", value="8765")
+    server_port = st.text_input("Server port", value="5050")
     ws_uri = f"ws://{server_host}:{server_port}"
 
     col1, col2 = st.columns(2)

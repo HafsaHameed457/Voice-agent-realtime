@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+let sharedCtx: AudioContext | null = null
+let recorderModuleLoaded = false
+
+function getAudioContext() {
+  if (!sharedCtx || sharedCtx.state === 'closed') {
+    sharedCtx = new AudioContext()
+  }
+  return sharedCtx
+}
+
 export function useAudioRecorder() {
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null)
-  const ctxRef = useRef<AudioContext | null>(null)
   const nodeRef = useRef<AudioWorkletNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const onChunkRef = useRef<((pcmBuffer: ArrayBufferLike) => void) | null>(null)
@@ -15,13 +24,16 @@ export function useAudioRecorder() {
   )
 
   const start = useCallback(async () => {
-    const ctx = new AudioContext()
-    ctxRef.current = ctx
-
-    await ctx.audioWorklet.addModule(
-      new URL('../workers/recorder.worklet.ts', import.meta.url),
-    )
-
+    const ctx = getAudioContext()
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
+    }
+    if (!recorderModuleLoaded) {
+      await ctx.audioWorklet.addModule(
+        new URL('../workers/recorder.worklet.ts', import.meta.url),
+      )
+      recorderModuleLoaded = true
+    }
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         sampleRate: { ideal: 24000 },
@@ -55,8 +67,6 @@ export function useAudioRecorder() {
     nodeRef.current = null
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
-    ctxRef.current?.close()
-    ctxRef.current = null
     setAnalyserNode(null)
   }, [])
 

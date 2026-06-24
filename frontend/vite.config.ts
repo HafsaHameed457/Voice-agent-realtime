@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/browser-stream': { target: 'ws://localhost:8765', ws: true },
+      '/browser-stream': { target: 'ws://localhost:5050', ws: true },
     },
   },
   build: { outDir: 'dist', emptyOutDir: true },

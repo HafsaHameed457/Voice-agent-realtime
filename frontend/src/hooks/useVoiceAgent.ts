@@ -34,6 +34,18 @@ export function useVoiceAgent() {
     setStatus('connecting')
     setMessages([])
 
+    try {
+      console.log('[VoiceAgent] Starting audio (user gesture)...')
+      await player.init()
+      await recorder.start()
+      console.log('[VoiceAgent] Audio started, connecting WebSocket...')
+    } catch (err) {
+      console.error('[VoiceAgent] Failed to start audio:', err)
+      addMessage('assistant', `[Error] Microphone access denied: ${err}`)
+      disconnect()
+      return
+    }
+
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = location.host
     const url = `${proto}//${host}/browser-stream?session_id=${sessionIdRef.current}`
@@ -41,18 +53,8 @@ export function useVoiceAgent() {
     const ws = new WebSocket(url)
     wsRef.current = ws
 
-    ws.onopen = async () => {
-      try {
-        await player.init()
-        await recorder.start()
-        if (recorder.analyserNode) {
-          // analyser setup done inside recorder
-        }
-      } catch (err) {
-        addMessage('assistant', `[Error] Microphone access denied: ${err}`)
-        disconnect()
-        return
-      }
+    ws.onopen = () => {
+      console.log('[VoiceAgent] WebSocket connected')
     }
 
     ws.onmessage = (event) => {
