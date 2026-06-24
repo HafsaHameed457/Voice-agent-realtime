@@ -115,6 +115,9 @@ class RedisSessionManager(BaseSessionManager):
     async def get_active_count(self) -> int:
         return await self._redis.scard(self._index_key())
 
+    async def health_check(self) -> None:
+        await self._redis.ping()
+
     async def _save_session(self, session: Session) -> None:
         await self._redis.set(self._session_key(session.session_id), _session_to_json(session))
 

@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 
-from starlette.requests import Request
-from starlette.responses import Response
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from starlette.requests import Request
+    from starlette.responses import Response
 
 from src.utils.logging import get_logger
 
 logger = get_logger("api.middleware")
 
 
-async def log_requests(request: Request, call_next: Any) -> Response:
+async def log_requests(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     start = time.perf_counter()
     client_ip = request.client.host if request.client else "unknown"
     method = request.method

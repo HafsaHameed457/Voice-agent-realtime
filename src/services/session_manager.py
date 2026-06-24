@@ -63,6 +63,9 @@ class SessionManager(BaseSessionManager):
     async def get_active_count(self) -> int:
         return len(self._sessions)
 
+    async def health_check(self) -> None:
+        pass
+
 
 def get_session_manager() -> BaseSessionManager:
     from src.config import get_settings  # noqa: PLC0415
