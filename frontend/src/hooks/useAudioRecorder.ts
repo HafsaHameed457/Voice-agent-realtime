@@ -16,6 +16,17 @@ export function useAudioRecorder() {
   const streamRef = useRef<MediaStream | null>(null)
   const onChunkRef = useRef<((pcmBuffer: ArrayBufferLike) => void) | null>(null)
 
+  useEffect(() => {
+    const ctx = getAudioContext()
+    if (!recorderModuleLoaded) {
+      ctx.audioWorklet.addModule(
+        new URL('../workers/recorder.worklet.ts', import.meta.url),
+      ).then(() => {
+        recorderModuleLoaded = true
+      }).catch(() => {})
+    }
+  }, [])
+
   const onChunk = useCallback(
     (cb: (pcmBuffer: ArrayBufferLike) => void) => {
       onChunkRef.current = cb

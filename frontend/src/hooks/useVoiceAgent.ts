@@ -15,15 +15,19 @@ export function useVoiceAgent() {
   const isCallActive = useRef(false)
   const isConnecting = useRef(false)
   const doConnectRef = useRef<(() => Promise<void>) | null>(null)
+  const pendingAudioRef = useRef<string[]>([])
 
   const recorder = useAudioRecorder()
   const player = useAudioPlayer()
 
   recorder.onChunk((pcmBuffer) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return
     const arr = new Int16Array(pcmBuffer)
     const b64 = int16ToBase64(arr)
-    wsRef.current.send(JSON.stringify({ type: 'audio', audio: b64 }))
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'audio', audio: b64 }))
+    } else {
+      pendingAudioRef.current.push(b64)
+    }
   })
 
   const addMessage = useCallback((role: 'user' | 'assistant', text: string) => {
@@ -34,6 +38,7 @@ export function useVoiceAgent() {
     isCallActive.current = false
     isConnecting.current = false
     retryCount.current = 0
+    pendingAudioRef.current = []
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current)
       reconnectTimer.current = null
@@ -71,21 +76,6 @@ export function useVoiceAgent() {
       return
     }
 
-    try {
-      await player.init()
-      await recorder.start()
-    } catch (err) {
-      console.error('[VoiceAgent] Failed to start audio:', err)
-      addMessage('assistant', `[Error] Microphone access denied: ${err}`)
-      cleanup()
-      return
-    }
-
-    if (!isCallActive.current) {
-      cleanup()
-      return
-    }
-
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = location.host
     const url = `${proto}//${host}/browser-stream?session_id=${sessionIdRef.current}`
@@ -94,7 +84,10 @@ export function useVoiceAgent() {
     wsRef.current = ws
 
     ws.onopen = () => {
-      console.log('[VoiceAgent] WebSocket connected')
+      for (const b64 of pendingAudioRef.current) {
+        ws.send(JSON.stringify({ type: 'audio', audio: b64 }))
+      }
+      pendingAudioRef.current = []
     }
 
     ws.onmessage = (event) => {
@@ -132,6 +125,23 @@ export function useVoiceAgent() {
       if (isCallActive.current) {
         setStatus('error')
       }
+    }
+
+    try {
+      await Promise.all([
+        player.init(),
+        recorder.start(),
+      ])
+    } catch (err) {
+      console.error('[VoiceAgent] Failed to start audio:', err)
+      addMessage('assistant', `[Error] Microphone access denied: ${err}`)
+      cleanup()
+      return
+    }
+
+    if (!isCallActive.current) {
+      cleanup()
+      return
     }
   }, [addMessage, player, recorder, cleanup, scheduleReconnect])
 

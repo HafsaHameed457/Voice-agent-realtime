@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { base64ToUint8Array } from '../utils/base64'
 
 let sharedCtx: AudioContext | null = null
@@ -13,6 +13,17 @@ function getAudioContext() {
 
 export function useAudioPlayer() {
   const nodeRef = useRef<AudioWorkletNode | null>(null)
+
+  useEffect(() => {
+    const ctx = getAudioContext()
+    if (!playerModuleLoaded) {
+      ctx.audioWorklet.addModule(
+        new URL('../workers/player.worklet.ts', import.meta.url),
+      ).then(() => {
+        playerModuleLoaded = true
+      }).catch(() => {})
+    }
+  }, [])
 
   const init = useCallback(async () => {
     if (nodeRef.current) return
