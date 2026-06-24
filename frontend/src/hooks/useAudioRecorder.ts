@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 let sharedCtx: AudioContext | null = null
 let recorderModuleLoaded = false
@@ -72,5 +72,5 @@ export function useAudioRecorder() {
 
   useEffect(() => () => stop(), [stop])
 
-  return { start, stop, onChunk, analyserNode }
+  return useMemo(() => ({ start, stop, onChunk, analyserNode }), [start, stop, onChunk, analyserNode])
 }

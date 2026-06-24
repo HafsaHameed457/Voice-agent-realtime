@@ -13,6 +13,8 @@ export function useVoiceAgent() {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(null)
   const retryCount = useRef(0)
   const isCallActive = useRef(false)
+  const isConnecting = useRef(false)
+  const doConnectRef = useRef<(() => Promise<void>) | null>(null)
 
   const recorder = useAudioRecorder()
   const player = useAudioPlayer()
@@ -28,21 +30,57 @@ export function useVoiceAgent() {
     setMessages((prev) => [...prev, { role, text, timestamp: Date.now() }])
   }, [])
 
-  const connect = useCallback(async () => {
-    isCallActive.current = true
+  const cleanup = useCallback(() => {
+    isCallActive.current = false
+    isConnecting.current = false
     retryCount.current = 0
-    setStatus('connecting')
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current)
+      reconnectTimer.current = null
+    }
+    recorder.stop()
+    player.stop()
+    if (wsRef.current) {
+      wsRef.current.onopen = null
+      wsRef.current.onmessage = null
+      wsRef.current.onclose = null
+      wsRef.current.onerror = null
+      wsRef.current.close()
+      wsRef.current = null
+    }
+    setStatus('disconnected')
+    setIsSpeaking(false)
     setMessages([])
+  }, [recorder, player])
+
+  const scheduleReconnect = useCallback(() => {
+    if (!isCallActive.current) return
+    const delay = Math.min(1000 * 2 ** retryCount.current, 30000)
+    retryCount.current++
+    setStatus('connecting')
+    reconnectTimer.current = setTimeout(() => doConnectRef.current?.(), delay)
+  }, [])
+
+  doConnectRef.current = useCallback(async () => {
+    if (isConnecting.current) return
+    isConnecting.current = true
+    if (!isCallActive.current) {
+      cleanup()
+      return
+    }
 
     try {
-      console.log('[VoiceAgent] Starting audio (user gesture)...')
       await player.init()
       await recorder.start()
-      console.log('[VoiceAgent] Audio started, connecting WebSocket...')
     } catch (err) {
       console.error('[VoiceAgent] Failed to start audio:', err)
       addMessage('assistant', `[Error] Microphone access denied: ${err}`)
-      disconnect()
+      cleanup()
+      return
+    }
+
+    if (!isCallActive.current) {
+      cleanup()
       return
     }
 
@@ -61,6 +99,7 @@ export function useVoiceAgent() {
       const data = JSON.parse(event.data)
       switch (data.type) {
         case 'session.ready':
+          isConnecting.current = false
           setStatus('connected')
           break
         case 'transcript':
@@ -92,30 +131,23 @@ export function useVoiceAgent() {
         setStatus('error')
       }
     }
-  }, [addMessage, player, recorder])
+  }, [addMessage, player, recorder, cleanup, scheduleReconnect])
 
-  const scheduleReconnect = useCallback(() => {
-    const delay = Math.min(1000 * 2 ** retryCount.current, 30000)
-    retryCount.current++
+  const connect = useCallback(() => {
+    if (isConnecting.current) return
+    cleanup()
+    isCallActive.current = true
+    retryCount.current = 0
     setStatus('connecting')
-    reconnectTimer.current = setTimeout(() => connect(), delay)
-  }, [connect])
+    setMessages([])
+    doConnectRef.current?.()
+  }, [cleanup])
 
   const disconnect = useCallback(() => {
-    isCallActive.current = false
-    if (reconnectTimer.current) {
-      clearTimeout(reconnectTimer.current)
-      reconnectTimer.current = null
-    }
-    recorder.stop()
-    player.stop()
-    wsRef.current?.close()
-    wsRef.current = null
-    setStatus('disconnected')
-    setIsSpeaking(false)
-  }, [recorder, player])
+    cleanup()
+  }, [cleanup])
 
-  useEffect(() => () => disconnect(), [disconnect])
+  useEffect(() => () => cleanup(), [cleanup])
 
   return { status, messages, isSpeaking, connect, disconnect }
 }

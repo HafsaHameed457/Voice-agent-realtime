@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { base64ToUint8Array } from '../utils/base64'
 
 let sharedCtx: AudioContext | null = null
@@ -48,5 +48,5 @@ export function useAudioPlayer() {
     nodeRef.current = null
   }, [clearQueue])
 
-  return { init, play, clearQueue, stop }
+  return useMemo(() => ({ init, play, clearQueue, stop }), [init, play, clearQueue, stop])
 }
