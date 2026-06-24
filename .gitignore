@@ -135,6 +135,8 @@ dist
 # Project specific
 plan.md
 .env
+docker-compose.yml
+docker-compose.prod.yml
 __pycache__/
 *.pyc
 .pytest_cache/
