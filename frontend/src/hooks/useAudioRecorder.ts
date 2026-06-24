@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 let sharedCtx: AudioContext | null = null
 let recorderModuleLoaded = false
@@ -11,7 +11,7 @@ function getAudioContext() {
 }
 
 export function useAudioRecorder() {
-  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
   const nodeRef = useRef<AudioWorkletNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const onChunkRef = useRef<((pcmBuffer: ArrayBufferLike) => void) | null>(null)
@@ -59,7 +59,7 @@ export function useAudioRecorder() {
     const analyser = ctx.createAnalyser()
     analyser.fftSize = 256
     source.connect(analyser)
-    setAnalyserNode(analyser)
+    analyserRef.current = analyser
   }, [])
 
   const stop = useCallback(() => {
@@ -67,10 +67,10 @@ export function useAudioRecorder() {
     nodeRef.current = null
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
-    setAnalyserNode(null)
+    analyserRef.current = null
   }, [])
 
   useEffect(() => () => stop(), [stop])
 
-  return useMemo(() => ({ start, stop, onChunk, analyserNode }), [start, stop, onChunk, analyserNode])
+  return useMemo(() => ({ start, stop, onChunk }), [start, stop, onChunk])
 }

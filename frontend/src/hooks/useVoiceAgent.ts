@@ -45,7 +45,9 @@ export function useVoiceAgent() {
       wsRef.current.onmessage = null
       wsRef.current.onclose = null
       wsRef.current.onerror = null
-      wsRef.current.close()
+      if (wsRef.current.readyState !== WebSocket.CONNECTING) {
+        wsRef.current.close()
+      }
       wsRef.current = null
     }
     setStatus('disconnected')
@@ -147,7 +149,9 @@ export function useVoiceAgent() {
     cleanup()
   }, [cleanup])
 
-  useEffect(() => () => cleanup(), [cleanup])
+  const cleanupRef = useRef(cleanup)
+  cleanupRef.current = cleanup
+  useEffect(() => () => cleanupRef.current(), [])
 
   return { status, messages, isSpeaking, connect, disconnect }
 }
