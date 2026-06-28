@@ -19,6 +19,28 @@ export function useVoiceAgent() {
 
   const recorder = useAudioRecorder()
   const player = useAudioPlayer()
+  const localAudioRef = useRef<Int16Array[]>([])
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  const sendAudioBlob = useCallback(() => {
+    const chunks = localAudioRef.current
+    localAudioRef.current = []
+    if (chunks.length === 0) return
+
+    const totalLen = chunks.reduce((acc, a) => acc + a.length, 0)
+    const combined = new Int16Array(totalLen)
+    let offset = 0
+    for (const chunk of chunks) {
+      combined.set(chunk, offset)
+      offset += chunk.length
+    }
+    const b64 = int16ToBase64(combined)
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'audio', audio: b64 }))
+    } else {
+      pendingAudioRef.current.push(b64)
+    }
+  }, [])
 
   recorder.onChunk((pcmBuffer) => {
     const arr = new Int16Array(pcmBuffer)
@@ -27,12 +49,13 @@ export function useVoiceAgent() {
       sum += Math.abs(arr[i])
     }
     if (sum / arr.length < 500) return
-    const b64 = int16ToBase64(arr)
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'audio', audio: b64 }))
-    } else {
-      pendingAudioRef.current.push(b64)
+
+    localAudioRef.current.push(arr)
+
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
     }
+    silenceTimerRef.current = setTimeout(sendAudioBlob, 1000)
   })
 
   const addMessage = useCallback((role: 'user' | 'assistant', text: string) => {
@@ -44,6 +67,11 @@ export function useVoiceAgent() {
     isConnecting.current = false
     retryCount.current = 0
     pendingAudioRef.current = []
+    localAudioRef.current = []
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current)
       reconnectTimer.current = null
