@@ -5,7 +5,7 @@ let recorderModuleLoaded = false
 
 function getAudioContext() {
   if (!sharedCtx || sharedCtx.state === 'closed') {
-    sharedCtx = new AudioContext()
+    sharedCtx = new AudioContext({ sampleRate: 24000 })
   }
   return sharedCtx
 }

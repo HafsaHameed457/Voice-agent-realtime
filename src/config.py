@@ -27,8 +27,8 @@ class Settings(BaseSettings):
 
     system_message: str = Field(
         default=(
-            "You are a cheerful and bubbly customer support agent who deals "
-            "with customers efficiently and says haha now and then please."
+            "You are a friendly customer support agent. Respond concisely "
+            "in 1-2 short sentences. Keep responses brief and natural."
         ),
         validation_alias="SYSTEM_MESSAGE",
     )
