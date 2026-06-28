@@ -70,6 +70,8 @@ class PipelineOrchestrator:
         if not self._connected:
             return
         self._audio_buffer.extend(pcm16_chunk)
+        buf_len_s = (len(self._audio_buffer) / 2) / self._sample_rate
+        logger.info("send_audio: buf=%.2fs chunk=%d", buf_len_s, len(pcm16_chunk))
         if self._flush_task and not self._flush_task.done():
             self._flush_task.cancel()
         self._flush_task = asyncio.create_task(self._delayed_flush())
@@ -77,14 +79,17 @@ class PipelineOrchestrator:
     async def _delayed_flush(self) -> None:
         try:
             duration_s = (len(self._audio_buffer) / 2) / self._sample_rate
+            logger.info("_delayed_flush: buf=%.2fs min=%.2f", duration_s, self._min_audio_duration)
             if duration_s < self._min_audio_duration:
                 return
             await asyncio.sleep(self._silence_timeout)
             if not self._audio_buffer or self._is_processing:
+                logger.info("_delayed_flush: skip (empty=%s processing=%s)", not self._audio_buffer, self._is_processing)
                 return
+            logger.info("_delayed_flush: flushing buf=%.2fs", (len(self._audio_buffer) / 2) / self._sample_rate)
             await self._flush()
         except asyncio.CancelledError:
-            pass
+            logger.info("_delayed_flush: cancelled")
 
     async def send_text(self, text: str) -> None:
         if not self._connected:
@@ -102,9 +107,11 @@ class PipelineOrchestrator:
         self._is_processing = True
         audio_data = bytes(self._audio_buffer)
         self._audio_buffer.clear()
+        logger.info("_flush: sending %d bytes to STT", len(audio_data))
 
         try:
             transcript = await self._stt.transcribe(audio_data, self._sample_rate)
+            logger.info("_flush: STT result=%s", transcript if transcript else "(empty)")
             if not transcript:
                 return
 
@@ -122,6 +129,7 @@ class PipelineOrchestrator:
             full_response = ""
             async for chunk in self._llm.generate(self._history):
                 full_response += chunk
+            logger.info("_generate_response: LLM result=%s", full_response[:100] if full_response else "(empty)")
             if not full_response:
                 return
 
@@ -129,6 +137,7 @@ class PipelineOrchestrator:
             await self._handlers.on_agent_transcript(full_response)
 
             audio_pcm16 = await self._tts.synthesize(full_response)
+            logger.info("_generate_response: TTS result=%d bytes", len(audio_pcm16) if audio_pcm16 else 0)
             if audio_pcm16:
                 audio_b64 = base64.b64encode(audio_pcm16).decode("ascii")
                 await self._handlers.on_audio_delta(audio_b64, "")
