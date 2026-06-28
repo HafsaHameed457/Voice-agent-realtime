@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     groq_api_key: str = Field(..., validation_alias="GROQ_API_KEY")
     groq_llm_model: str = Field(
-        default="llama-3.1-70b-versatile",
+        default="llama-3.3-70b-versatile",
         validation_alias="GROQ_LLM_MODEL",
     )
     groq_stt_model: str = Field(
