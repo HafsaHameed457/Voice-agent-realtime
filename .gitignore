@@ -135,6 +135,7 @@ dist
 # Project specific
 plan.md
 .env
+.env.example
 docker-compose.yml
 docker-compose.prod.yml
 .vite/
@@ -149,3 +150,5 @@ build/
 *.egg-info/
 .venv/
 venv/
+frontend/dist/
+*.egg

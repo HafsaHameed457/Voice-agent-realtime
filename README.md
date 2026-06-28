@@ -87,6 +87,63 @@ Opens at `http://localhost:5173`. The Vite dev server proxies `/browser-stream` 
 5. TTS audio is converted to mu-law and streamed back to the frontend
 6. Frontend decodes mu-law and plays through an AudioWorklet
 
+## Deployment
+
+### Production Build
+
+```bash
+# Build frontend
+cd frontend
+npm run build
+# Output goes to frontend/dist/
+
+# Serve backend with production ASGI server
+pip install gunicorn
+gunicorn src.main:app --worker-class uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:5050
+```
+
+### Reverse Proxy (Nginx)
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # Frontend static files
+    root /path/to/frontend/dist;
+    index index.html;
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # WebSocket proxy to backend
+    location /browser-stream {
+        proxy_pass http://127.0.0.1:5050;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+### Docker
+
+A `Dockerfile` and `docker-compose.yml` can be added for containerized deployment. The backend runs on port 5050; the frontend is served as static files via nginx or the backend itself.
+
+### Environment Variables for Production
+
+| Variable | Required | Notes |
+|---|---|---|
+| `GROQ_API_KEY` | Yes | Set via environment, not in `.env` file |
+| `LOG_LEVEL` | No | Set to `WARNING` in production |
+| `LOG_FORMAT` | No | Use `json` for log aggregation |
+
+**Security**: Never commit `.env` files. Set secrets via environment variables or a secrets manager in production.
+
 ## Tech Stack
 
 - **Frontend**: React, TypeScript, Vite, Web Audio API (AudioWorklet)
