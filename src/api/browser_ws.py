@@ -132,7 +132,6 @@ async def browser_stream(websocket: WebSocket) -> None:
                 audio_b64 = data.get("audio", "")
                 if audio_b64:
                     pcm16 = base64.b64decode(audio_b64)
-                    logger.info("Audio chunk received: size=%d bytes", len(pcm16))
                     await pipeline.send_audio(pcm16)
 
             elif msg_type == "ping":

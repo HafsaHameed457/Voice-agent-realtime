@@ -26,11 +26,8 @@ export function useVoiceAgent() {
     for (let i = 0; i < arr.length; i++) {
       sum += Math.abs(arr[i])
     }
-    const avg = sum / arr.length
-    console.log('[DEBUG] onChunk avg=', avg, 'wsState=', wsRef.current?.readyState, 'pending=', pendingAudioRef.current.length)
-    if (avg < 500) return
+    if (sum / arr.length < 500) return
     const b64 = int16ToBase64(arr)
-    console.log('[DEBUG] Sending audio chunk, b64len=', b64.length)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'audio', audio: b64 }))
     } else {
