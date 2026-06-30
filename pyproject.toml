@@ -16,6 +16,7 @@ dependencies = [
     "redis>=5.0",
     "groq>=0.12",
     "edge-tts>=7.2",
+    "prometheus-fastapi-instrumentator>=7.0",
 ]
 [project.optional-dependencies]
 dev = [

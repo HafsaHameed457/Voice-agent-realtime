@@ -106,6 +106,9 @@ async def browser_stream(websocket: WebSocket) -> None:
     logger.info("Browser client connected: session_id=%s", session_id)
 
     session_manager = get_session_manager()
+    # Start Redis session manager if applicable
+    if hasattr(session_manager, "start"):
+        await session_manager.start()
     session = await session_manager.create_session(session_id)
 
     handler = BrowserStreamHandler(websocket, session_manager, session, session_id)
@@ -145,4 +148,7 @@ async def browser_stream(websocket: WebSocket) -> None:
         session.set_state(SessionState.DISCONNECTED)
         await session_manager.update_session(session)
         await pipeline.disconnect()
+        # Stop Redis session manager if applicable
+        if hasattr(session_manager, "stop"):
+            await session_manager.stop()
         logger.info("Browser session cleaned up: %s", session_id)

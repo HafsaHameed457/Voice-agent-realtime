@@ -5,7 +5,7 @@ import io
 import struct
 import wave
 
-from pydub import AudioSegment  # type: ignore[import-untyped]
+from pydub import AudioSegment
 
 MULAW_BIAS = 0x84
 MULAW_CLIP = 32635

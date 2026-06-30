@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
     redis_key_prefix: str = Field(default="voice_agent", validation_alias="REDIS_KEY_PREFIX")
 
+    stt_timeout: float = Field(default=10.0, validation_alias="STT_TIMEOUT")
+    llm_timeout: float = Field(default=15.0, validation_alias="LLM_TIMEOUT")
+    tts_timeout: float = Field(default=10.0, validation_alias="TTS_TIMEOUT")
+
+    silence_timeout: float = Field(default=1.0, validation_alias="SILENCE_TIMEOUT")
+    min_audio_duration: float = Field(default=0.5, validation_alias="MIN_AUDIO_DURATION")
+    vad_threshold: int = Field(default=500, validation_alias="VAD_THRESHOLD")
+
 
 @lru_cache
 def get_settings() -> Settings:
