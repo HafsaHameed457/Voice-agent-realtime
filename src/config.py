@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     groq_api_key: str = Field(..., validation_alias="GROQ_API_KEY")
     groq_llm_model: str = Field(
-        default="llama-3.1-70b-versatile",
+        default="llama-3.3-70b-versatile",
         validation_alias="GROQ_LLM_MODEL",
     )
     groq_stt_model: str = Field(
@@ -27,8 +27,8 @@ class Settings(BaseSettings):
 
     system_message: str = Field(
         default=(
-            "You are a cheerful and bubbly customer support agent who deals "
-            "with customers efficiently and says haha now and then please."
+            "You are a friendly customer support agent. Respond concisely "
+            "in 1-2 short sentences. Keep responses brief and natural."
         ),
         validation_alias="SYSTEM_MESSAGE",
     )
@@ -41,6 +41,14 @@ class Settings(BaseSettings):
 
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
     redis_key_prefix: str = Field(default="voice_agent", validation_alias="REDIS_KEY_PREFIX")
+
+    stt_timeout: float = Field(default=10.0, validation_alias="STT_TIMEOUT")
+    llm_timeout: float = Field(default=15.0, validation_alias="LLM_TIMEOUT")
+    tts_timeout: float = Field(default=10.0, validation_alias="TTS_TIMEOUT")
+
+    silence_timeout: float = Field(default=1.0, validation_alias="SILENCE_TIMEOUT")
+    min_audio_duration: float = Field(default=0.5, validation_alias="MIN_AUDIO_DURATION")
+    vad_threshold: int = Field(default=500, validation_alias="VAD_THRESHOLD")
 
 
 @lru_cache

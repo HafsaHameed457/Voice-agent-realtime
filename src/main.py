@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.browser_ws import router as browser_ws_router
 from src.api.routes import router as http_router
@@ -53,6 +54,9 @@ app.add_middleware(
 )
 
 app.middleware("http")(log_requests)
+
+# Prometheus metrics
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(http_router)

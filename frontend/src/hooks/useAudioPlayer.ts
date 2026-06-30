@@ -1,19 +1,42 @@
-import { useRef, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { base64ToUint8Array } from '../utils/base64'
 
+let sharedCtx: AudioContext | null = null
+let playerModuleLoaded = false
+
+function getAudioContext() {
+  if (!sharedCtx || sharedCtx.state === 'closed') {
+    sharedCtx = new AudioContext({ sampleRate: 24000 })
+  }
+  return sharedCtx
+}
+
 export function useAudioPlayer() {
-  const ctxRef = useRef<AudioContext | null>(null)
   const nodeRef = useRef<AudioWorkletNode | null>(null)
 
+  useEffect(() => {
+    const ctx = getAudioContext()
+    if (!playerModuleLoaded) {
+      ctx.audioWorklet.addModule(
+        new URL('../workers/player.worklet.ts', import.meta.url),
+      ).then(() => {
+        playerModuleLoaded = true
+      }).catch(() => {})
+    }
+  }, [])
+
   const init = useCallback(async () => {
-    if (ctxRef.current) return
-    const ctx = new AudioContext()
-    ctxRef.current = ctx
-
-    await ctx.audioWorklet.addModule(
-      new URL('../workers/player.worklet.ts', import.meta.url),
-    )
-
+    if (nodeRef.current) return
+    const ctx = getAudioContext()
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
+    }
+    if (!playerModuleLoaded) {
+      await ctx.audioWorklet.addModule(
+        new URL('../workers/player.worklet.ts', import.meta.url),
+      )
+      playerModuleLoaded = true
+    }
     const node = new AudioWorkletNode(ctx, 'pcm-player')
     node.connect(ctx.destination)
     nodeRef.current = node
@@ -34,9 +57,7 @@ export function useAudioPlayer() {
     clearQueue()
     nodeRef.current?.disconnect()
     nodeRef.current = null
-    ctxRef.current?.close()
-    ctxRef.current = null
   }, [clearQueue])
 
-  return { init, play, clearQueue, stop }
+  return useMemo(() => ({ init, play, clearQueue, stop }), [init, play, clearQueue, stop])
 }

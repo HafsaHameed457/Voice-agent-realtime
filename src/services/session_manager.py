@@ -74,5 +74,10 @@ def get_session_manager() -> BaseSessionManager:
     if settings.redis_url:
         from src.services.redis_session_manager import RedisSessionManager  # noqa: PLC0415
 
-        return RedisSessionManager(settings.redis_url, settings.redis_key_prefix)
+        return RedisSessionManager(
+            redis_url=settings.redis_url,
+            key_prefix=settings.redis_key_prefix,
+            ttl_seconds=86400,  # 24 hours
+            cleanup_interval=300,  # 5 minutes
+        )
     return SessionManager()

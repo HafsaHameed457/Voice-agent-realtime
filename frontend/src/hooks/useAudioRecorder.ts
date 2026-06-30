@@ -1,11 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+
+let sharedCtx: AudioContext | null = null
+let recorderModuleLoaded = false
+
+function getAudioContext() {
+  if (!sharedCtx || sharedCtx.state === 'closed') {
+    sharedCtx = new AudioContext({ sampleRate: 24000 })
+  }
+  return sharedCtx
+}
 
 export function useAudioRecorder() {
-  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null)
-  const ctxRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
   const nodeRef = useRef<AudioWorkletNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const onChunkRef = useRef<((pcmBuffer: ArrayBufferLike) => void) | null>(null)
+
+  useEffect(() => {
+    const ctx = getAudioContext()
+    if (!recorderModuleLoaded) {
+      ctx.audioWorklet.addModule(
+        new URL('../workers/recorder.worklet.ts', import.meta.url),
+      ).then(() => {
+        recorderModuleLoaded = true
+      }).catch(() => {})
+    }
+  }, [])
 
   const onChunk = useCallback(
     (cb: (pcmBuffer: ArrayBufferLike) => void) => {
@@ -15,13 +35,16 @@ export function useAudioRecorder() {
   )
 
   const start = useCallback(async () => {
-    const ctx = new AudioContext()
-    ctxRef.current = ctx
-
-    await ctx.audioWorklet.addModule(
-      new URL('../workers/recorder.worklet.ts', import.meta.url),
-    )
-
+    const ctx = getAudioContext()
+    if (ctx.state === 'suspended') {
+      await ctx.resume()
+    }
+    if (!recorderModuleLoaded) {
+      await ctx.audioWorklet.addModule(
+        new URL('../workers/recorder.worklet.ts', import.meta.url),
+      )
+      recorderModuleLoaded = true
+    }
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         sampleRate: { ideal: 24000 },
@@ -47,7 +70,7 @@ export function useAudioRecorder() {
     const analyser = ctx.createAnalyser()
     analyser.fftSize = 256
     source.connect(analyser)
-    setAnalyserNode(analyser)
+    analyserRef.current = analyser
   }, [])
 
   const stop = useCallback(() => {
@@ -55,12 +78,10 @@ export function useAudioRecorder() {
     nodeRef.current = null
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
-    ctxRef.current?.close()
-    ctxRef.current = null
-    setAnalyserNode(null)
+    analyserRef.current = null
   }, [])
 
   useEffect(() => () => stop(), [stop])
 
-  return { start, stop, onChunk, analyserNode }
+  return useMemo(() => ({ start, stop, onChunk }), [start, stop, onChunk])
 }

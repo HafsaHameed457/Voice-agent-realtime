@@ -135,8 +135,11 @@ dist
 # Project specific
 plan.md
 .env
+.env.example
 docker-compose.yml
 docker-compose.prod.yml
+.vite/
+frontend/.vite
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -147,3 +150,5 @@ build/
 *.egg-info/
 .venv/
 venv/
+frontend/dist/
+*.egg

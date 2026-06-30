@@ -16,7 +16,7 @@ pytest_plugins = ("pytest_asyncio",)
 
 def pytest_configure(config: pytest.Config) -> None:
     os.environ.setdefault("GROQ_API_KEY", "test-key")
-    os.environ.setdefault("GROQ_LLM_MODEL", "llama-3.1-70b-versatile")
+    os.environ.setdefault("GROQ_LLM_MODEL", "llama-3.3-70b-versatile")
     os.environ.setdefault("GROQ_STT_MODEL", "whisper-large-v3-turbo")
     os.environ.setdefault("SYSTEM_MESSAGE", "Test system message")
     os.environ.setdefault("TEMPERATURE", "0.8")
