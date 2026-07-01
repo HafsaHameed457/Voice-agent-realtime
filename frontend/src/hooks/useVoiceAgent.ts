@@ -131,8 +131,9 @@ export function useVoiceAgent(config: Partial<VoiceAgentConfig> = {}) {
         return
       }
 
-      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const host = location.host
+      const apiUrl = import.meta.env.VITE_API_URL || `${location.protocol}//${location.host}`
+      const proto = apiUrl.startsWith('https') ? 'wss:' : 'ws:'
+      const host = apiUrl.replace(/^https?:\/\//, '')
       const url = `${proto}//${host}/browser-stream?session_id=${sessionIdRef.current}`
       const ws = new WebSocket(url)
       wsRef.current = ws
