@@ -58,7 +58,8 @@ services:
   - type: cron
     name: keep-alive
     schedule: "*/10 * * * *"
-    command: curl -f https://voice-agent-api.onrender.com/health || exit 1
+    buildCommand: ""
+    startCommand: curl -f https://voice-agent-api.onrender.com/health || exit 1
     envVars:
       - key: RENDER_API_KEY
         sync: false
