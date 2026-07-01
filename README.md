@@ -2,6 +2,8 @@
 
 A real-time voice agent with speech-to-text, LLM inference, and text-to-speech, powered by Groq and Edge TTS.
 
+**Live Demo:** [https://voice-agent-realtime-rint.onrender.com](https://voice-agent-realtime-rint.onrender.com)
+
 ## Architecture
 
 ```
@@ -14,6 +16,8 @@ Frontend (Vite + React)          Backend (FastAPI + Uvicorn)
        │                                ├──► Groq STT (Whisper)
        │                                ├──► Groq LLM (llama)
        │                                └──► Edge TTS
+                                      Redis (session state)
+                                   Prometheus (metrics)
 ```
 
 - **Frontend**: Records microphone audio, performs silence detection, sends audio blobs via WebSocket, plays back TTS responses
@@ -26,6 +30,7 @@ Frontend (Vite + React)          Backend (FastAPI + Uvicorn)
 - Python 3.12+
 - Node.js 18+
 - A Groq API key
+- Redis (optional, for production session management)
 
 ### Backend
 
@@ -59,6 +64,13 @@ Copy `.env.example` to `.env` and configure:
 | `PORT` | `5050` | Backend port |
 | `HOST` | `0.0.0.0` | Backend host |
 | `LOG_LEVEL` | `INFO` | Logging level |
+| `REDIS_URL` | — | Redis URL (uses in-memory if unset) |
+| `STT_TIMEOUT` | `10.0` | STT request timeout (seconds) |
+| `LLM_TIMEOUT` | `15.0` | LLM request timeout (seconds) |
+| `TTS_TIMEOUT` | `10.0` | TTS request timeout (seconds) |
+| `SILENCE_TIMEOUT` | `1.0` | Silence before sending audio (seconds) |
+| `MIN_AUDIO_DURATION` | `0.5` | Minimum audio clip duration (seconds) |
+| `VAD_THRESHOLD` | `500` | Voice activity detection threshold |
 
 ## Running
 
@@ -89,63 +101,33 @@ Opens at `http://localhost:5173`. The Vite dev server proxies `/browser-stream` 
 
 ## Deployment
 
-### Production Build
+### Render (Free Tier)
 
-```bash
-# Build frontend
-cd frontend
-npm run build
-# Output goes to frontend/dist/
+See [DEPLOY.md](./DEPLOY.md) for step-by-step instructions.
 
-# Serve backend with production ASGI server
-pip install gunicorn
-gunicorn src.main:app --worker-class uvicorn.workers.UvicornWorker --workers 4 --bind 0.0.0.0:5050
-```
+Quick steps:
+1. Create a **Web Service** for the backend (Python 3.12, `pip install -r requirements.txt`)
+2. Create a **Static Site** for the frontend (`cd frontend && npm ci && npm run build`)
+3. Set up free Redis on [Upstash](https://upstash.com) (optional, for session persistence)
+4. Add environment variables in Render dashboard
 
-### Reverse Proxy (Nginx)
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    # Frontend static files
-    root /path/to/frontend/dist;
-    index index.html;
-
-    # SPA fallback
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # WebSocket proxy to backend
-    location /browser-stream {
-        proxy_pass http://127.0.0.1:5050;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_read_timeout 86400;
-    }
-}
-```
+**Resources:**
+- Backend: `https://voice-agent-api.onrender.com`
+- Frontend: `https://voice-agent-realtime-rint.onrender.com`
+- Health: `https://voice-agent-api.onrender.com/health`
+- Metrics: `https://voice-agent-api.onrender.com/metrics`
 
 ### Docker
 
-A `Dockerfile` and `docker-compose.yml` can be added for containerized deployment. The backend runs on port 5050; the frontend is served as static files via nginx or the backend itself.
+```bash
+docker-compose up
+```
 
-### Environment Variables for Production
-
-| Variable | Required | Notes |
-|---|---|---|
-| `GROQ_API_KEY` | Yes | Set via environment, not in `.env` file |
-| `LOG_LEVEL` | No | Set to `WARNING` in production |
-| `LOG_FORMAT` | No | Use `json` for log aggregation |
-
-**Security**: Never commit `.env` files. Set secrets via environment variables or a secrets manager in production.
+The backend runs on port 5050; the frontend is served as static files via nginx or the backend itself.
 
 ## Tech Stack
 
-- **Frontend**: React, TypeScript, Vite, Web Audio API (AudioWorklet)
-- **Backend**: Python, FastAPI, Uvicorn, Groq SDK, Edge TTS, pydub
+- **Frontend**: React 19, TypeScript, Vite, Web Audio API (AudioWorklet), Tailwind CSS
+- **Backend**: Python 3.12, FastAPI, Uvicorn, Groq SDK, Edge TTS, pydub
+- **Infrastructure**: Redis (session management), Prometheus (metrics), Gunicorn
 - **Audio**: PCM16, mu-law encoding, AudioWorklet processors
