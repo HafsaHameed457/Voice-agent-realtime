@@ -37,7 +37,6 @@ services:
     name: voice-agent-frontend
     runtime: static
     plan: free
-    region: oregon
     buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: frontend/dist
     routes:
@@ -52,13 +51,14 @@ services:
   - type: redis
     name: voice-agent-redis
     plan: free
-    region: oregon
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
     maxmemoryPolicy: allkeys-lru
 
   - type: cron
     name: keep-alive
     schedule: "*/10 * * * *"
-    buildCommand: ""
     startCommand: curl -f https://voice-agent-api.onrender.com/health || exit 1
     envVars:
       - key: RENDER_API_KEY
