@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { base64ToUint8Array } from '../utils/base64'
+import { PLAYER_WORKLET } from '../utils/workletCode'
 
 let sharedCtx: AudioContext | null = null
-let playerModuleLoaded = false
+const blobUrl = URL.createObjectURL(
+  new Blob([PLAYER_WORKLET], { type: 'application/javascript' }),
+)
 
 function getAudioContext() {
   if (!sharedCtx || sharedCtx.state === 'closed') {
@@ -14,29 +17,13 @@ function getAudioContext() {
 export function useAudioPlayer() {
   const nodeRef = useRef<AudioWorkletNode | null>(null)
 
-  useEffect(() => {
-    const ctx = getAudioContext()
-    if (!playerModuleLoaded) {
-      ctx.audioWorklet.addModule(
-        new URL('../workers/player.worklet.ts', import.meta.url),
-      ).then(() => {
-        playerModuleLoaded = true
-      }).catch(() => {})
-    }
-  }, [])
-
   const init = useCallback(async () => {
     if (nodeRef.current) return
     const ctx = getAudioContext()
     if (ctx.state === 'suspended') {
       await ctx.resume()
     }
-    if (!playerModuleLoaded) {
-      await ctx.audioWorklet.addModule(
-        new URL('../workers/player.worklet.ts', import.meta.url),
-      )
-      playerModuleLoaded = true
-    }
+    await ctx.audioWorklet.addModule(blobUrl)
     const node = new AudioWorkletNode(ctx, 'pcm-player')
     node.connect(ctx.destination)
     nodeRef.current = node

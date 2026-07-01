@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { RECORDER_WORKLET } from '../utils/workletCode'
 
 let sharedCtx: AudioContext | null = null
-let recorderModuleLoaded = false
+const blobUrl = URL.createObjectURL(
+  new Blob([RECORDER_WORKLET], { type: 'application/javascript' }),
+)
 
 function getAudioContext() {
   if (!sharedCtx || sharedCtx.state === 'closed') {
@@ -16,17 +19,6 @@ export function useAudioRecorder() {
   const streamRef = useRef<MediaStream | null>(null)
   const onChunkRef = useRef<((pcmBuffer: ArrayBufferLike) => void) | null>(null)
 
-  useEffect(() => {
-    const ctx = getAudioContext()
-    if (!recorderModuleLoaded) {
-      ctx.audioWorklet.addModule(
-        new URL('../workers/recorder.worklet.ts', import.meta.url),
-      ).then(() => {
-        recorderModuleLoaded = true
-      }).catch(() => {})
-    }
-  }, [])
-
   const onChunk = useCallback(
     (cb: (pcmBuffer: ArrayBufferLike) => void) => {
       onChunkRef.current = cb
@@ -39,12 +31,8 @@ export function useAudioRecorder() {
     if (ctx.state === 'suspended') {
       await ctx.resume()
     }
-    if (!recorderModuleLoaded) {
-      await ctx.audioWorklet.addModule(
-        new URL('../workers/recorder.worklet.ts', import.meta.url),
-      )
-      recorderModuleLoaded = true
-    }
+    await ctx.audioWorklet.addModule(blobUrl)
+
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         sampleRate: { ideal: 24000 },
