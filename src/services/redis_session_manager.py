@@ -20,6 +20,14 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+def _create_redis_client(redis_url: str) -> redis.Redis:
+    kwargs: dict[str, object] = {"decode_responses": True}
+    if redis_url.startswith("rediss://"):
+        kwargs["ssl_check_hostname"] = False
+        kwargs["ssl_cert_reqs"] = None
+    return redis.from_url(redis_url, **kwargs)
+
+
 def _session_to_json(session: Session) -> str:
     data = asdict(session)
     data["created_at"] = session.created_at.isoformat()
@@ -59,7 +67,7 @@ class RedisSessionManager(BaseSessionManager):
         ttl_seconds: int = 86400,
         cleanup_interval: int = 300,
     ) -> None:
-        self._redis = redis.from_url(redis_url, decode_responses=True)
+        self._redis = _create_redis_client(redis_url)
         self._prefix = key_prefix
         self._ttl = ttl_seconds
         self._cleanup_interval = cleanup_interval

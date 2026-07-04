@@ -33,7 +33,7 @@ class TestHealthEndpoints:
 
     @pytest.mark.asyncio
     async def test_ready_with_mocks(self, async_client: AsyncClient) -> None:
-        with patch("src.services.session_manager.get_session_manager") as mock_get_manager:
+        with patch("src.api.routes.get_session_manager") as mock_get_manager:
             mock_manager = AsyncMock()
             mock_manager.health_check = AsyncMock()
             mock_get_manager.return_value = mock_manager
